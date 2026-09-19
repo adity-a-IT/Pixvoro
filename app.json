@@ -1,25 +1,49 @@
 {
   "expo": {
-    "name": "MY-PDF",
-    "slug": "MY-PDF",
+    "name": "Pixvoro",
+    "slug": "pixvoro",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0F172A"
+    },
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0F172A"
       },
-      "predictiveBackGestureEnabled": false
+      "package": "com.pixvoro.app",
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "READ_MEDIA_IMAGES"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Pixvoro to access your photos to select images for converting to PDF documents.",
+          "cameraPermission": "Allow Pixvoro to access your camera to take photos and instantly convert them into PDFs."
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "bac15da9-3c20-4130-8762-bbc7924f5d03"
+      }
     }
   }
 }
