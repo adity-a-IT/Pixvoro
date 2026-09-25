@@ -24,7 +24,7 @@ jobs:
       - name: ☕ Setup Java JDK 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
+          distribution: 'temurin'
           java-version: '17'
 
       - name: 🟢 Setup Node.js
@@ -34,10 +34,7 @@ jobs:
           cache: 'npm'
 
       - name: 📦 Install Dependencies
-        run: npm ci
-
-      - name: 🛠️ Setup Android SDK
-        uses: android-actions/setup-android@v3
+        run: npm install
 
       - name: 🔑 Make Gradlew Executable
         run: chmod +x android/gradlew
@@ -47,15 +44,18 @@ jobs:
           cd android
           ./gradlew assembleRelease --no-daemon
 
-      - name: 📋 Find and Rename APK
+      - name: 📋 Find and Prepare APK
         run: |
           mkdir -p build-output
-          APK_PATH=$(find android/app/build/outputs/apk -name "*.apk" | head -n 1)
+          APK_PATH=$(find android/app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          if [ -z "$APK_PATH" ]; then
+            APK_PATH=$(find android/app/build/outputs/apk -name "*.apk" | head -n 1)
+          fi
           if [ -f "$APK_PATH" ]; then
             cp "$APK_PATH" build-output/Pixvoro.apk
-            echo "APK generated successfully at build-output/Pixvoro.apk"
+            echo "APK ready at build-output/Pixvoro.apk"
           else
-            echo "::error::No APK file found in build outputs!"
+            echo "::error::No APK file found in outputs!"
             exit 1
           fi
 
@@ -66,15 +66,14 @@ jobs:
           path: build-output/Pixvoro.apk
           retention-days: 30
 
-      - name: 🚀 Create GitHub Release with APK
+      - name: 🚀 Publish GitHub Release
         uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')
         with:
-          name: Pixvoro Android App (Latest APK)
-          tag_name: latest-apk
+          name: Pixvoro Android App (v1.0.0)
+          tag_name: v1.0.0
           draft: false
           prerelease: false
-          generate_release_notes: true
           files: build-output/Pixvoro.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
