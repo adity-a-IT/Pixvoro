@@ -36,6 +36,9 @@ jobs:
       - name: 📦 Install Dependencies
         run: npm install
 
+      - name: ⚙️ Generate Android Native Project (Expo Prebuild)
+        run: npx expo prebuild --platform android --no-install
+
       - name: 🔑 Make Gradlew Executable
         run: chmod +x android/gradlew
 
@@ -70,7 +73,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')
         with:
-          name: Pixvoro Android App (v1.0.0)
+          name: Pixvoro Android App (Latest APK)
           tag_name: v1.0.0
           draft: false
           prerelease: false
