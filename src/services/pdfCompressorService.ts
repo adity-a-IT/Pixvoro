@@ -6,6 +6,7 @@ import { Buffer } from 'buffer';
 import { RecentPDF } from '../types';
 import { ensurePdfDirectoryExists, PDF_DIRECTORY, saveRecentPdf } from './storageService';
 import { sanitizeFilename, formatBytes } from '../utils/helpers';
+import { readUriAsBase64, ensureLocalPdfUri } from '../utils/platformHelper';
 
 export interface CompressPdfResult {
   pdfRecord: RecentPDF;
@@ -35,16 +36,14 @@ export async function pickAndCompressExistingPdf(
     }
 
     const fileAsset = result.assets[0];
-    const sourceUri = fileAsset.uri;
     const originalName = fileAsset.name || 'document.pdf';
+    const sourceUri = await ensureLocalPdfUri(fileAsset.uri, originalName);
     const originalSizeBytes = fileAsset.size ?? 0;
 
     if (onProgress) onProgress('Analyzing PDF file...');
 
     // Read existing PDF binary
-    const base64Data = await FileSystem.readAsStringAsync(sourceUri, {
-      encoding: FileSystem.EncodingType.Base64,
-    });
+    const base64Data = await readUriAsBase64(sourceUri);
 
     const pdfBytes = Buffer.from(base64Data, 'base64');
 

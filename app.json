@@ -38,7 +38,9 @@
           "photosPermission": "Allow Pixvoro to access your photos to select images for converting to PDF documents.",
           "cameraPermission": "Allow Pixvoro to access your camera to take photos and instantly convert them into PDFs."
         }
-      ]
+      ],
+      "expo-sharing",
+      "expo-status-bar"
     ],
     "extra": {
       "eas": {

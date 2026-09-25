@@ -20,7 +20,7 @@ import { useApp } from '../context/AppContext';
 import { Header } from '../components/Header';
 import { formatBytes, formatDate } from '../utils/helpers';
 import { loadPdfDetails } from '../services/pdfEditService';
-import { readUriAsBase64, shareOrDownloadPdf, isWeb } from '../utils/platformHelper';
+import { readUriAsBase64, shareOrDownloadPdf, isWeb, ensureLocalPdfUri } from '../utils/platformHelper';
 import { Spacing, BorderRadius } from '../theme';
 
 type PdfViewerProps = NativeStackScreenProps<RootStackParamList, 'PdfViewer'>;
@@ -47,10 +47,11 @@ export const PdfViewerScreen: React.FC<PdfViewerProps> = ({ route, navigation })
   const loadDocument = async () => {
     try {
       setLoading(true);
-      const b64 = await readUriAsBase64(pdfUri);
+      const safeUri = await ensureLocalPdfUri(pdfUri, pdfName);
+      const b64 = await readUriAsBase64(safeUri);
       setBase64Data(b64);
 
-      const details = await loadPdfDetails(pdfUri, pdfName);
+      const details = await loadPdfDetails(safeUri, pdfName);
       setPageCount(details.pageCount);
       setFileSize(details.fileSize);
       setTitle(details.title || '');
@@ -83,29 +84,95 @@ export const PdfViewerScreen: React.FC<PdfViewerProps> = ({ route, navigation })
       <!DOCTYPE html>
       <html>
         <head>
-          <meta name="viewport" content="width=device-width, initial-scale=${zoomScale / 100}, maximum-scale=4.0, user-scalable=yes">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=4.0, user-scalable=yes">
+          <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
           <style>
             * { margin: 0; padding: 0; box-sizing: border-box; }
             body, html {
               width: 100%;
-              height: 100%;
+              min-height: 100%;
               background-color: ${bg};
               display: flex;
-              justify-content: center;
+              flex-direction: column;
               align-items: center;
-              overflow: auto;
-              -webkit-user-select: none;
+              padding: 12px 6px;
+              gap: 16px;
+              overflow-x: hidden;
+              overflow-y: auto;
+              -webkit-overflow-scrolling: touch;
             }
-            embed, object, iframe {
+            .pdf-page-canvas {
+              width: ${zoomScale}% !important;
+              max-width: 95%;
+              height: auto !important;
+              border-radius: 4px;
+              box-shadow: 0 4px 12px rgba(0,0,0,0.18);
+              filter: ${isDarkMode ? 'invert(0.88) hue-rotate(180deg)' : 'none'};
+              background-color: #ffffff;
+            }
+            #fallback-container {
               width: 100vw;
               height: 100vh;
+              display: none;
+            }
+            #fallback-embed {
+              width: 100%;
+              height: 100%;
               border: none;
               filter: ${isDarkMode ? 'invert(0.88) hue-rotate(180deg)' : 'none'};
             }
           </style>
         </head>
         <body>
-          <embed src="data:application/pdf;base64,${base64Data}" type="application/pdf" />
+          <div id="pages-container" style="display:flex; flex-direction:column; align-items:center; width:100%; gap:14px;"></div>
+          <div id="fallback-container">
+            <embed id="fallback-embed" src="data:application/pdf;base64,${base64Data}" type="application/pdf" />
+          </div>
+
+          <script>
+            (function() {
+              try {
+                var binary = atob("${base64Data}");
+                var len = binary.length;
+                var bytes = new Uint8Array(len);
+                for (var i = 0; i < len; i++) {
+                  bytes[i] = binary.charCodeAt(i);
+                }
+
+                if (window.pdfjsLib) {
+                  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+                  pdfjsLib.getDocument({ data: bytes }).promise.then(async function(pdf) {
+                    var container = document.getElementById('pages-container');
+                    for (var num = 1; num <= pdf.numPages; num++) {
+                      var page = await pdf.getPage(num);
+                      var viewport = page.getViewport({ scale: 2.0 });
+                      var canvas = document.createElement('canvas');
+                      canvas.className = 'pdf-page-canvas';
+                      canvas.height = viewport.height;
+                      canvas.width = viewport.width;
+                      container.appendChild(canvas);
+
+                      var context = canvas.getContext('2d');
+                      await page.render({ canvasContext: context, viewport: viewport }).promise;
+                    }
+                  }).catch(function(err) {
+                    showFallback();
+                  });
+                } else {
+                  showFallback();
+                }
+              } catch(e) {
+                showFallback();
+              }
+
+              function showFallback() {
+                var c = document.getElementById('pages-container');
+                var f = document.getElementById('fallback-container');
+                if (c) c.style.display = 'none';
+                if (f) f.style.display = 'block';
+              }
+            })();
+          </script>
         </body>
       </html>
     `;

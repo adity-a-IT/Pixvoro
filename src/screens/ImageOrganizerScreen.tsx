@@ -33,7 +33,7 @@ export const ImageOrganizerScreen: React.FC<ImageOrganizerProps> = ({ navigation
       }
 
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         quality: 1,
       });
 
@@ -67,7 +67,7 @@ export const ImageOrganizerScreen: React.FC<ImageOrganizerProps> = ({ navigation
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsMultipleSelection: true,
         quality: 1,
       });

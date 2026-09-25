@@ -12,7 +12,7 @@ import {
 } from '../types';
 import { ensurePdfDirectoryExists, PDF_DIRECTORY, saveRecentPdf } from './storageService';
 import { sanitizeFilename, formatBytes } from '../utils/helpers';
-import { readUriAsBase64, isWeb, saveOrDownloadPdf } from '../utils/platformHelper';
+import { readUriAsBase64, isWeb, saveOrDownloadPdf, ensureLocalPdfUri } from '../utils/platformHelper';
 
 /**
  * Converts a Hex color code (#RRGGBB) into pdf-lib RGB normalized values [0..1].
@@ -34,7 +34,8 @@ function hexToRgb(hex: string) {
  * Reads a PDF file and loads structural information (pages, metadata, count).
  */
 export async function loadPdfDetails(pdfUri: string, pdfName: string): Promise<PdfDocumentDetails> {
-  const base64Data = await readUriAsBase64(pdfUri);
+  const localUri = await ensureLocalPdfUri(pdfUri, pdfName);
+  const base64Data = await readUriAsBase64(localUri);
 
   const pdfBytes = Buffer.from(base64Data, 'base64');
   const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
@@ -55,11 +56,22 @@ export async function loadPdfDetails(pdfUri: string, pdfName: string): Promise<P
     });
   }
 
-  const fileInfo = await FileSystem.getInfoAsync(pdfUri);
-  const fileSize = fileInfo.exists ? (fileInfo.size ?? 0) : 0;
+  let fileSize = 0;
+  try {
+    const fileInfo = await FileSystem.getInfoAsync(localUri);
+    if (fileInfo.exists && fileInfo.size) {
+      fileSize = fileInfo.size;
+    }
+  } catch {
+    // If getInfoAsync throws on certain URIs, estimate from base64
+    fileSize = Math.round((base64Data.length * 3) / 4);
+  }
+  if (!fileSize) {
+    fileSize = Math.round((base64Data.length * 3) / 4);
+  }
 
   return {
-    uri: pdfUri,
+    uri: localUri,
     name: pdfName,
     pageCount: count,
     fileSize,
@@ -87,7 +99,8 @@ export async function applyPdfEdits(
     throw new Error('PDF must contain at least 1 page.');
   }
 
-  const base64Data = await readUriAsBase64(pdfUri);
+  const localUri = await ensureLocalPdfUri(pdfUri, originalName);
+  const base64Data = await readUriAsBase64(localUri);
 
   const sourceBytes = Buffer.from(base64Data, 'base64');
   const sourceDoc = await PDFDocument.load(sourceBytes, { ignoreEncryption: true });

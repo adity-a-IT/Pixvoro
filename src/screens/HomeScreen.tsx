@@ -28,6 +28,7 @@ import { EmptyState } from '../components/EmptyState';
 import { ProgressModal } from '../components/ProgressModal';
 import { Footer } from '../components/Footer';
 import { pickAndCompressExistingPdf } from '../services/pdfCompressorService';
+import { ensureLocalPdfUri } from '../utils/platformHelper';
 import { Spacing, BorderRadius } from '../theme';
 
 type HomeScreenProps = NativeStackScreenProps<RootStackParamList, 'Home'>;
@@ -62,7 +63,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsMultipleSelection: true,
         quality: 1,
         selectionLimit: 0,
@@ -102,7 +103,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       }
 
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         quality: 1,
       });
 
@@ -156,8 +157,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const fileAsset = result.assets[0];
+        const safeUri = await ensureLocalPdfUri(fileAsset.uri, fileAsset.name);
         navigation.navigate('PdfViewer', {
-          pdfUri: fileAsset.uri,
+          pdfUri: safeUri,
           pdfName: fileAsset.name || 'Document.pdf',
         });
       }
@@ -176,8 +178,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const fileAsset = result.assets[0];
+        const safeUri = await ensureLocalPdfUri(fileAsset.uri, fileAsset.name);
         navigation.navigate('PdfEditor', {
-          pdfUri: fileAsset.uri,
+          pdfUri: safeUri,
           pdfName: fileAsset.name || 'Document.pdf',
         });
       }
@@ -189,11 +192,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   // Open PDF in Built-in PDF Reader
   const handleOpenPdf = async (pdf: RecentPDF) => {
     try {
-      const info = await FileSystem.getInfoAsync(pdf.uri);
-      if (!info.exists) {
-        Alert.alert('File Not Found', 'The requested PDF file no longer exists on this device.');
-        await refreshRecentPdfs();
-        return;
+      try {
+        const info = await FileSystem.getInfoAsync(pdf.uri);
+        if (info.exists === false) {
+          Alert.alert('File Not Found', 'The requested PDF file no longer exists on this device.');
+          await refreshRecentPdfs();
+          return;
+        }
+      } catch {
+        // If getInfoAsync fails on non-standard URI, proceed to open
       }
       navigation.navigate('PdfViewer', { pdfUri: pdf.uri, pdfName: pdf.name });
     } catch (error) {
@@ -290,36 +297,61 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               fullWidth
               icon={<Ionicons name="camera-outline" size={22} color="#FFFFFF" />}
               onPress={handleTakeCameraPhoto}
-              style={{ marginBottom: Spacing.sm }}
+              style={{ marginBottom: Spacing.sm + 2 }}
             />
 
             <View style={styles.secondaryRow}>
-              <Button
-                title="Pick Images"
-                variant="secondary"
-                size="md"
-                icon={<Ionicons name="images-outline" size={18} color={colors.textPrimary} />}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                style={[
+                  styles.actionCard,
+                  { backgroundColor: colors.surfaceSecondary, borderColor: colors.border },
+                ]}
                 onPress={handlePickImages}
-                style={{ flex: 1 }}
-              />
+              >
+                <View style={[styles.actionIconBadge, { backgroundColor: colors.card }]}>
+                  <Ionicons name="images-outline" size={20} color={colors.primary} />
+                </View>
+                <Text style={[styles.actionCardTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+                  Pick Images
+                </Text>
+              </TouchableOpacity>
 
-              <Button
-                title="Read PDF"
-                variant="secondary"
-                size="md"
-                icon={<Ionicons name="eye-outline" size={18} color={colors.textPrimary} />}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                style={[
+                  styles.actionCard,
+                  { backgroundColor: colors.surfaceSecondary, borderColor: colors.border },
+                ]}
                 onPress={handlePickPdfForViewing}
-                style={{ flex: 1 }}
-              />
+              >
+                <View style={[styles.actionIconBadge, { backgroundColor: colors.card }]}>
+                  <Ionicons name="eye-outline" size={20} color={colors.primary} />
+                </View>
+                <Text style={[styles.actionCardTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+                  Read PDF
+                </Text>
+              </TouchableOpacity>
 
-              <Button
-                title="Edit PDF"
-                variant="outline"
-                size="md"
-                icon={<Ionicons name="create-outline" size={18} color={colors.primary} />}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                style={[
+                  styles.actionCard,
+                  {
+                    backgroundColor: colors.surfaceSecondary,
+                    borderColor: colors.primary,
+                    borderWidth: 1.5,
+                  },
+                ]}
                 onPress={handlePickPdfForEditing}
-                style={{ flex: 1 }}
-              />
+              >
+                <View style={[styles.actionIconBadge, { backgroundColor: colors.card }]}>
+                  <Ionicons name="create-outline" size={20} color={colors.primary} />
+                </View>
+                <Text style={[styles.actionCardTitle, { color: colors.primary }]} numberOfLines={1}>
+                  Edit PDF
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -475,6 +507,29 @@ const styles = StyleSheet.create({
   secondaryRow: {
     flexDirection: 'row',
     gap: Spacing.sm,
+    marginTop: 2,
+  },
+  actionCard: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 4,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+  },
+  actionIconBadge: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  actionCardTitle: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   featuresRow: {
     flexDirection: 'row',
